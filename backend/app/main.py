@@ -5,7 +5,10 @@ from app.config import settings
 from app.database import Base, engine
 import app.models
 
-# Create all database tables
+# Import API Routers
+from app.api.user import router as user_router
+
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -22,6 +25,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register API Routers
+app.include_router(user_router)
 
 
 @app.get("/")
