@@ -6,8 +6,9 @@ from app.dependencies import get_db
 from app.models.user import User
 from app.models.interview_session import InterviewSession
 from app.models.interview_question import InterviewQuestion
+from app.models.interview_answer import InterviewAnswer
 
-from app.schemas.interview import InterviewCreate
+from app.schemas.interview import InterviewCreate, AnswerSubmit
 
 from app.prompts.interview_prompt import build_interview_prompt
 from app.services.gemini_service import generate_questions
@@ -102,14 +103,12 @@ def generate_interview_questions(
             detail="Interview session not found"
         )
 
-    # Build Prompt
     prompt = build_interview_prompt(
         technology=interview.interview_type,
         difficulty=interview.difficulty,
         num_questions=5
     )
 
-    # Generate Questions using Gemini
     ai_response = generate_questions(prompt)
 
     questions = []
@@ -122,11 +121,11 @@ def generate_interview_questions(
             continue
 
         if line[0].isdigit():
-            line = line.split(".", 1)[-1].strip()
+            line = line.split(".", 1)[1].strip()
 
         questions.append(line)
 
-    # Delete previous questions
+    # Delete old questions
     db.query(InterviewQuestion).filter(
         InterviewQuestion.session_id == session_id
     ).delete()
@@ -135,7 +134,6 @@ def generate_interview_questions(
 
     saved_questions = []
 
-    # Save Questions
     for index, question in enumerate(questions, start=1):
 
         interview_question = InterviewQuestion(
@@ -214,4 +212,82 @@ def get_interview_questions(
             }
             for question in questions
         ]
+    }
+
+
+# ==========================================================
+# Submit Interview Answer
+# ==========================================================
+
+@router.post("/{session_id}/answer")
+def submit_answer(
+    session_id: int,
+    answer_data: AnswerSubmit,
+    db: Session = Depends(get_db)
+):
+
+    interview = (
+        db.query(InterviewSession)
+        .filter(InterviewSession.id == session_id)
+        .first()
+    )
+
+    if not interview:
+        raise HTTPException(
+            status_code=404,
+            detail="Interview session not found"
+        )
+
+    question = (
+        db.query(InterviewQuestion)
+        .filter(
+            InterviewQuestion.id == answer_data.question_id,
+            InterviewQuestion.session_id == session_id
+        )
+        .first()
+    )
+
+    if not question:
+        raise HTTPException(
+            status_code=404,
+            detail="Question not found"
+        )
+
+    existing_answer = (
+        db.query(InterviewAnswer)
+        .filter(
+            InterviewAnswer.question_id == answer_data.question_id
+        )
+        .first()
+    )
+
+    if existing_answer:
+
+        existing_answer.answer = answer_data.answer
+
+        db.commit()
+        db.refresh(existing_answer)
+
+        return {
+            "message": "Answer updated successfully",
+            "question_id": question.id,
+            "question_number": question.question_number,
+            "answer": existing_answer.answer
+        }
+
+    new_answer = InterviewAnswer(
+        session_id=session_id,
+        question_id=answer_data.question_id,
+        answer=answer_data.answer
+    )
+
+    db.add(new_answer)
+    db.commit()
+    db.refresh(new_answer)
+
+    return {
+        "message": "Answer submitted successfully",
+        "question_id": question.id,
+        "question_number": question.question_number,
+        "answer": new_answer.answer
     }
