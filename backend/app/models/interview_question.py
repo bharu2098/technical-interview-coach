@@ -15,10 +15,16 @@ class InterviewQuestion(Base):
         nullable=False
     )
 
-    question = Column(Text, nullable=False)
+    # Order of the question in the interview
+    question_number = Column(Integer, nullable=False)
 
+    # The actual interview question
+    question_text = Column(Text, nullable=False)
+
+    # Technology/category (Python, Java, SQL, etc.)
     category = Column(String(100), nullable=False)
 
+    # Easy / Medium / Hard
     difficulty = Column(String(50), nullable=False)
 
     session = relationship(
