@@ -8,39 +8,74 @@ from app.database import Base
 class InterviewSession(Base):
     __tablename__ = "interview_sessions"
 
+    # Primary Key (Global Unique ID)
     id = Column(Integer, primary_key=True, index=True)
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # User who owns this interview
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False
+    )
 
-    interview_type = Column(String(100), nullable=False)
+    # Interview number for each user
+    # Example:
+    # User 1 -> 1,2,3...
+    # User 2 -> 1,2...
+    interview_number = Column(
+        Integer,
+        nullable=False
+    )
 
-    difficulty = Column(String(50), nullable=False)
+    # Technology / Interview Type
+    interview_type = Column(
+        String(100),
+        nullable=False
+    )
 
-    status = Column(String(50), default="In Progress")
+    # Easy / Intermediate / Hard
+    difficulty = Column(
+        String(50),
+        nullable=False
+    )
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Interview Status
+    status = Column(
+        String(50),
+        default="In Progress"
+    )
 
-    # Relationship with User
+    # Created Time
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+    # -------------------------
+    # Relationships
+    # -------------------------
+
+    # User
     user = relationship(
         "User",
         back_populates="interview_sessions"
     )
 
-    # Relationship with Questions
+    # Questions
     questions = relationship(
         "InterviewQuestion",
         back_populates="session",
         cascade="all, delete-orphan"
     )
 
-    # Relationship with Answers
+    # Answers
     answers = relationship(
         "InterviewAnswer",
         back_populates="session",
         cascade="all, delete-orphan"
     )
 
-    # Relationship with Result
+    # Final Result
     result = relationship(
         "InterviewResult",
         back_populates="session",

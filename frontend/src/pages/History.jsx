@@ -76,8 +76,8 @@ const data = await response.json();
                   className="border-b hover:bg-gray-100"
                 >
                   <td className="p-3 text-center">
-                    {interview.id}
-                  </td>
+                    {interview.interview_number}
+                 </td>
 
                   <td className="p-3 text-center">
                     {interview.interview_type}

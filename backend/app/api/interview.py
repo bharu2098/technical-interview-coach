@@ -24,7 +24,6 @@ router = APIRouter(
 # ==========================================================
 # Create Interview Session
 # ==========================================================
-
 @router.post("/")
 def create_interview(
     interview: InterviewCreate,
@@ -42,8 +41,28 @@ def create_interview(
             detail="User not found"
         )
 
+    # Get last interview number for this user
+    last_session = (
+        db.query(InterviewSession)
+        .filter(
+            InterviewSession.user_id == interview.user_id
+        )
+        .order_by(
+            InterviewSession.interview_number.desc()
+        )
+        .first()
+    )
+
+    # Generate next interview number
+    next_interview_number = (
+        1 if last_session is None
+        else last_session.interview_number + 1
+    )
+
+    # Create interview session
     session = InterviewSession(
         user_id=interview.user_id,
+        interview_number=next_interview_number,
         interview_type=interview.interview_type,
         difficulty=interview.difficulty,
         status="In Progress"
@@ -56,6 +75,7 @@ def create_interview(
     return {
         "message": "Interview session created successfully",
         "session_id": session.id,
+        "interview_number": session.interview_number,
         "status": session.status
     }
 # ==========================================================
@@ -99,13 +119,14 @@ def get_user_interviews(
 
     return [
         {
-            "id": interview.id,
-            "user_id": interview.user_id,
-            "interview_type": interview.interview_type,
-            "difficulty": interview.difficulty,
-            "status": interview.status,
-            "created_at": interview.created_at
-        }
+        "id": interview.id,
+        "interview_number": interview.interview_number,
+        "user_id": interview.user_id,
+       "interview_type": interview.interview_type,
+       "difficulty": interview.difficulty,
+       "status": interview.status,
+       "created_at": interview.created_at
+}
         for interview in interviews
     ]
 
