@@ -35,7 +35,8 @@ function Login() {
       });
 
       localStorage.setItem("token", data.access_token);
-      localStorage.setItem("userEmail", formData.email);
+      localStorage.setItem("userId", data.user_id);
+      localStorage.setItem("userEmail", data.email);
 
       alert("Login Successful!");
 

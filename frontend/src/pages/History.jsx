@@ -13,14 +13,17 @@ function History() {
 
   async function loadHistory() {
     try {
-      const response = await fetch(`${BASE_URL}/interviews/`);
+      const userId = localStorage.getItem("userId");
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch interview history");
-      }
+const response = await fetch(
+  `${BASE_URL}/interviews/user/${userId}`
+);
 
-      const data = await response.json();
+if (!response.ok) {
+  throw new Error("Failed to fetch interview history");
+}
 
+const data = await response.json();
       // Sort latest interviews first
       const sorted = [...data].sort(
         (a, b) => new Date(b.created_at) - new Date(a.created_at)

@@ -19,10 +19,10 @@ function Dashboard() {
   const [interviews, setInterviews] = useState([]);
 
   const [formData, setFormData] = useState({
-    user_id: 1, // Replace with JWT user later
-    interview_type: "React Developer",
-    difficulty: "Medium",
-  });
+  user_id: Number(localStorage.getItem("userId")),
+  interview_type: "React Developer",
+  difficulty: "Medium",
+});
 
   useEffect(() => {
     loadDashboard();
@@ -32,8 +32,17 @@ function Dashboard() {
     try {
       const BASE_URL = "https://technical-interview-coach.onrender.com";
 
-const response = await fetch(`${BASE_URL}/interviews/`);
-      const data = await response.json();
+const userId = localStorage.getItem("userId");
+
+const response = await fetch(
+  `${BASE_URL}/interviews/user/${userId}`
+);
+
+if (!response.ok) {
+  throw new Error("Failed to load interviews");
+}
+
+const data = await response.json();
 
       const sorted = [...data].sort(
         (a, b) => new Date(b.created_at) - new Date(a.created_at)

@@ -21,8 +21,6 @@ router = APIRouter(
     prefix="/interviews",
     tags=["Interviews"]
 )
-
-
 # ==========================================================
 # Create Interview Session
 # ==========================================================
@@ -60,28 +58,6 @@ def create_interview(
         "session_id": session.id,
         "status": session.status
     }
-
-@router.get("/")
-def get_all_interviews(
-    db: Session = Depends(get_db)
-):
-    interviews = (
-        db.query(InterviewSession)
-        .order_by(InterviewSession.created_at.desc())
-        .all()
-    )
-
-    return [
-        {
-            "id": interview.id,
-            "user_id": interview.user_id,
-            "interview_type": interview.interview_type,
-            "difficulty": interview.difficulty,
-            "status": interview.status,
-            "created_at": interview.created_at
-        }
-        for interview in interviews
-    ]
 # ==========================================================
 # Get Interview Session
 # ==========================================================
@@ -104,6 +80,34 @@ def get_interview(
         )
 
     return session
+
+# ==========================================================
+# Get User Interviews
+# ==========================================================
+
+@router.get("/user/{user_id}")
+def get_user_interviews(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    interviews = (
+        db.query(InterviewSession)
+        .filter(InterviewSession.user_id == user_id)
+        .order_by(InterviewSession.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": interview.id,
+            "user_id": interview.user_id,
+            "interview_type": interview.interview_type,
+            "difficulty": interview.difficulty,
+            "status": interview.status,
+            "created_at": interview.created_at
+        }
+        for interview in interviews
+    ]
 
 
 # ==========================================================
@@ -360,47 +364,7 @@ def submit_answer(
         "score": answer.score,
         "feedback": answer.feedback
     }
-# ===============================
-# AI Evaluation
-# ===============================
 
-    prompt = build_evaluation_prompt(
-    question.question_text,
-    answer.answer
-)
-
-    ai_response = evaluate_answer(prompt)
-
-    score = 0
-    feedback = ""
-
-    for line in ai_response.split("\n"):
-        line = line.strip()
-
-        if line.lower().startswith("score"):
-            try:
-                score = int(line.split(":", 1)[1].strip())
-            except ValueError:
-                score = 0
-        elif line.lower().startswith("feedback"):
-            feedback_index = ai_response.lower().find("feedback:")
-
-            if feedback_index != -1:
-                feedback = ai_response[feedback_index + len("feedback:"):].strip()
-
-    answer.score = score
-    answer.feedback = feedback
-
-    db.commit()
-    db.refresh(answer)
-
-    return {
-        "message": "Answer evaluated successfully",
-        "question_id": question.id,
-        "question_number": question.question_number,
-        "score": answer.score,
-        "feedback": answer.feedback
-}
 # ==========================================================
 # Generate Final Interview Report
 # ==========================================================

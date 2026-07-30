@@ -15,9 +15,11 @@ router = APIRouter(
 
 @router.post("/login", response_model=Token)
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
+    db_user = (
+        db.query(User)
+        .filter(User.email == user.email)
+        .first()
+    )
 
     if not db_user:
         raise HTTPException(
@@ -40,5 +42,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
 
     return {
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user_id": db_user.id,
+        "email": db_user.email
     }
