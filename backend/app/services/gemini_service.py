@@ -1,51 +1,47 @@
-import google.generativeai as genai
+from groq import Groq
 
 from app.config import settings
 
-# Configure Gemini
-genai.configure(api_key=settings.GOOGLE_API_KEY)
+client = Groq(api_key=settings.GROQ_API_KEY)
 
-# Load Gemini Model
-model = genai.GenerativeModel("gemini-2.5-flash")
+MODEL = "llama-3.3-70b-versatile"
 
 
-# ==========================================================
-# Generate Interview Questions
-# ==========================================================
+def _generate(prompt: str, task: str):
+    try:
+        print(f"\n========== {task.upper()} PROMPT ==========\n")
+        print(prompt)
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.7
+        )
+
+        text = response.choices[0].message.content.strip()
+
+        print(f"\n========== {task.upper()} RESPONSE ==========\n")
+        print(text)
+
+        return text
+
+    except Exception as e:
+        print(f"\nGroq {task} Error: {e}\n")
+        raise Exception(f"Groq {task} Error: {e}")
+
 
 def generate_questions(prompt: str):
-    """
-    Generate interview questions using Gemini AI.
-    """
+    return _generate(prompt, "Question Generation")
 
-    try:
-        response = model.generate_content(prompt)
-
-        if response.text:
-            return response.text
-
-        return "No questions generated."
-
-    except Exception as e:
-        raise Exception(f"Gemini Error: {str(e)}")
-
-
-# ==========================================================
-# Evaluate Candidate Answer
-# ==========================================================
 
 def evaluate_answer(prompt: str):
-    """
-    Evaluate candidate answer using Gemini AI.
-    """
+    return _generate(prompt, "Answer Evaluation")
 
-    try:
-        response = model.generate_content(prompt)
 
-        if response.text:
-            return response.text
-
-        return "No evaluation generated."
-
-    except Exception as e:
-        raise Exception(f"Gemini Error: {str(e)}")
+def generate_report(prompt: str):
+    return _generate(prompt, "Interview Report")

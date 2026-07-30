@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
+from app.prompts.evaluation_prompt import build_evaluation_prompt
+from app.prompts.report_prompt import build_report_prompt
+from app.services.gemini_service import (
+    generate_questions,
+    evaluate_answer,
+    generate_report
+)
 from app.dependencies import get_db
 
 from app.models.user import User
@@ -9,9 +15,7 @@ from app.models.interview_question import InterviewQuestion
 from app.models.interview_answer import InterviewAnswer
 
 from app.schemas.interview import InterviewCreate, AnswerSubmit
-
 from app.prompts.interview_prompt import build_interview_prompt
-from app.services.gemini_service import generate_questions
 
 router = APIRouter(
     prefix="/interviews",
@@ -57,7 +61,27 @@ def create_interview(
         "status": session.status
     }
 
+@router.get("/")
+def get_all_interviews(
+    db: Session = Depends(get_db)
+):
+    interviews = (
+        db.query(InterviewSession)
+        .order_by(InterviewSession.created_at.desc())
+        .all()
+    )
 
+    return [
+        {
+            "id": interview.id,
+            "user_id": interview.user_id,
+            "interview_type": interview.interview_type,
+            "difficulty": interview.difficulty,
+            "status": interview.status,
+            "created_at": interview.created_at
+        }
+        for interview in interviews
+    ]
 # ==========================================================
 # Get Interview Session
 # ==========================================================
@@ -218,7 +242,6 @@ def get_interview_questions(
 # ==========================================================
 # Submit Interview Answer
 # ==========================================================
-
 @router.post("/{session_id}/answer")
 def submit_answer(
     session_id: int,
@@ -226,6 +249,7 @@ def submit_answer(
     db: Session = Depends(get_db)
 ):
 
+    # Check interview session
     interview = (
         db.query(InterviewSession)
         .filter(InterviewSession.id == session_id)
@@ -238,6 +262,7 @@ def submit_answer(
             detail="Interview session not found"
         )
 
+    # Check question
     question = (
         db.query(InterviewQuestion)
         .filter(
@@ -253,41 +278,219 @@ def submit_answer(
             detail="Question not found"
         )
 
+    # Check if answer already exists
     existing_answer = (
         db.query(InterviewAnswer)
         .filter(
+            InterviewAnswer.session_id == session_id,
             InterviewAnswer.question_id == answer_data.question_id
         )
         .first()
     )
 
+    # Save or update answer
     if existing_answer:
+        answer = existing_answer
+        answer.answer = answer_data.answer
 
-        existing_answer.answer = answer_data.answer
+    else:
+        answer = InterviewAnswer(
+            session_id=session_id,
+            question_id=answer_data.question_id,
+            answer=answer_data.answer
+        )
 
-        db.commit()
-        db.refresh(existing_answer)
+        db.add(answer)
 
-        return {
-            "message": "Answer updated successfully",
-            "question_id": question.id,
-            "question_number": question.question_number,
-            "answer": existing_answer.answer
-        }
+    db.commit()
+    db.refresh(answer)
 
-    new_answer = InterviewAnswer(
-        session_id=session_id,
-        question_id=answer_data.question_id,
-        answer=answer_data.answer
+    # Build evaluation prompt
+    prompt = build_evaluation_prompt(
+        question.question_text,
+        answer.answer
     )
 
-    db.add(new_answer)
+    print("\n========== PROMPT SENT TO GEMINI ==========\n")
+    print(prompt)
+    print("\n===========================================\n")
+
+    # Evaluate with Gemini
+    ai_response = evaluate_answer(prompt)
+
+    print("\n========== GEMINI RESPONSE ==========\n")
+    print(ai_response)
+    print("\n=====================================\n")
+
+    # Extract score and feedback
+    import re
+
+    score = 0
+    feedback = ""
+
+    score_match = re.search(
+        r"Score\s*:\s*(\d+)",
+        ai_response,
+        re.IGNORECASE
+    )
+
+    if score_match:
+        score = int(score_match.group(1))
+
+    feedback_match = re.search(
+        r"Feedback\s*:\s*(.*)",
+        ai_response,
+        re.IGNORECASE | re.DOTALL
+    )
+
+    if feedback_match:
+        feedback = feedback_match.group(1).strip()
+
+    # Save evaluation
+    answer.score = score
+    answer.feedback = feedback
+
     db.commit()
-    db.refresh(new_answer)
+    db.refresh(answer)
 
     return {
-        "message": "Answer submitted successfully",
+        "message": "Answer evaluated successfully",
         "question_id": question.id,
         "question_number": question.question_number,
-        "answer": new_answer.answer
+        "score": answer.score,
+        "feedback": answer.feedback
+    }
+# ===============================
+# AI Evaluation
+# ===============================
+
+    prompt = build_evaluation_prompt(
+    question.question_text,
+    answer.answer
+)
+
+    ai_response = evaluate_answer(prompt)
+
+    score = 0
+    feedback = ""
+
+    for line in ai_response.split("\n"):
+        line = line.strip()
+
+        if line.lower().startswith("score"):
+            try:
+                score = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                score = 0
+        elif line.lower().startswith("feedback"):
+            feedback_index = ai_response.lower().find("feedback:")
+
+            if feedback_index != -1:
+                feedback = ai_response[feedback_index + len("feedback:"):].strip()
+
+    answer.score = score
+    answer.feedback = feedback
+
+    db.commit()
+    db.refresh(answer)
+
+    return {
+        "message": "Answer evaluated successfully",
+        "question_id": question.id,
+        "question_number": question.question_number,
+        "score": answer.score,
+        "feedback": answer.feedback
+}
+# ==========================================================
+# Generate Final Interview Report
+# ==========================================================
+
+@router.get("/{session_id}/report")
+def get_interview_report(
+    session_id: int,
+    db: Session = Depends(get_db)
+):
+
+    interview = (
+        db.query(InterviewSession)
+        .filter(InterviewSession.id == session_id)
+        .first()
+    )
+
+    if not interview:
+        raise HTTPException(
+            status_code=404,
+            detail="Interview session not found"
+        )
+
+    questions = (
+        db.query(InterviewQuestion)
+        .filter(InterviewQuestion.session_id == session_id)
+        .order_by(InterviewQuestion.question_number)
+        .all()
+    )
+
+    answers = (
+        db.query(InterviewAnswer)
+        .filter(InterviewAnswer.session_id == session_id)
+        .all()
+    )
+
+    if not answers:
+        raise HTTPException(
+            status_code=404,
+            detail="No answers found."
+        )
+
+    answered_questions = len(answers)
+    total_questions = len(questions)
+
+    total_score = sum(answer.score or 0 for answer in answers)
+    average_score = total_score / answered_questions
+    percentage = (total_score / (total_questions * 10)) * 100
+
+    questions_answers = ""
+
+    for question in questions:
+
+        answer = next(
+            (
+                a for a in answers
+                if a.question_id == question.id
+            ),
+            None
+        )
+
+        questions_answers += (
+            f"Question {question.question_number}: "
+            f"{question.question_text}\n"
+        )
+
+        questions_answers += (
+            f"Answer: "
+            f"{answer.answer if answer else 'Not Answered'}\n\n"
+        )
+
+    prompt = build_report_prompt(
+        technology=interview.interview_type,
+        total_score=total_score,
+        average_score=average_score,
+        percentage=percentage,
+        questions_answers=questions_answers
+    )
+
+    ai_report = generate_report(prompt)
+    interview.status = "Completed"
+    db.commit()
+    return {
+        "session_id": session_id,
+        "technology": interview.interview_type,
+        "difficulty": interview.difficulty,
+        "status": interview.status,
+        "total_questions": total_questions,
+        "answered_questions": answered_questions,
+        "total_score": total_score,
+        "average_score": round(average_score, 2),
+        "percentage": round(percentage, 2),
+        "ai_report": ai_report
     }

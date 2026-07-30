@@ -7,6 +7,7 @@ import app.models
 
 # Import API Routers
 from app.api.user import router as user_router
+from app.api.auth import router as auth_router
 from app.api.interview import router as interview_router
 
 # Create all database tables
@@ -29,6 +30,7 @@ app.add_middleware(
 
 # Register API Routers
 app.include_router(user_router)
+app.include_router(auth_router)
 app.include_router(interview_router)
 
 
