@@ -22,7 +22,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "https://technical-interview-coach.vercel.app",
+        "https://technical-interview-coach-rirvvjiks-bhgs-projects-019873cb.vercel.app",
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
