@@ -5,40 +5,34 @@ from app.config import settings
 from app.database import Base, engine
 import app.models
 
-# Import API Routers
 from app.api.user import router as user_router
 from app.api.auth import router as auth_router
 from app.api.interview import router as interview_router
 
-# Create database tables
 Base.metadata.create_all(bind=engine)
 
-# Create FastAPI App
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="AI-powered Technical Interview Coach API"
 )
 
-# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Local React app
-        "*"                       # Temporary for deployment/testing
+        "http://localhost:5173",
+        "https://technical-interview-coach.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Register API Routers
 app.include_router(user_router)
 app.include_router(auth_router)
 app.include_router(interview_router)
 
 
-# Root Endpoint
 @app.get("/")
 def root():
     return {
@@ -47,7 +41,6 @@ def root():
     }
 
 
-# Health Check Endpoint
 @app.get("/health")
 def health():
     return {
