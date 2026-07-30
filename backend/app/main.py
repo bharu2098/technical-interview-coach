@@ -10,9 +10,10 @@ from app.api.user import router as user_router
 from app.api.auth import router as auth_router
 from app.api.interview import router as interview_router
 
-# Create all database tables
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Create FastAPI App
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -22,7 +23,10 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",  # Local React app
+        "*"                       # Temporary for deployment/testing
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,6 +38,7 @@ app.include_router(auth_router)
 app.include_router(interview_router)
 
 
+# Root Endpoint
 @app.get("/")
 def root():
     return {
@@ -42,6 +47,7 @@ def root():
     }
 
 
+# Health Check Endpoint
 @app.get("/health")
 def health():
     return {
