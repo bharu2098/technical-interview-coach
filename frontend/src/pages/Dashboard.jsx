@@ -30,7 +30,9 @@ function Dashboard() {
 
   async function loadDashboard() {
     try {
-      const response = await fetch("http://127.0.0.1:8000/interviews/");
+      const BASE_URL = "https://technical-interview-coach.onrender.com";
+
+const response = await fetch(`${BASE_URL}/interviews/`);
       const data = await response.json();
 
       const sorted = [...data].sort(
